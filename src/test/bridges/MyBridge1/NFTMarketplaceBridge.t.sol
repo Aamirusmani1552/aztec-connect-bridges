@@ -53,7 +53,6 @@ contract NFTMarketplaceBridge is BridgeTestBase, IERC721Receiver {
         NFTMarketplace.NFT memory nftToken = nftMarketplace.getNFTListing(address(bridge), 0);
 
         assertEq(nftToken.owner, address(bridge));
-        console.log(nftToken.owner);
 
         // buying nft
         AztecTypes.AztecAsset memory inputAsset2 =
@@ -62,7 +61,7 @@ contract NFTMarketplaceBridge is BridgeTestBase, IERC721Receiver {
         AztecTypes.AztecAsset memory outputAsset =
             AztecTypes.AztecAsset({id: 3, erc20Address: address(nft), assetType: AztecTypes.AztecAssetType.VIRTUAL});
 
-        uint64 auxData2 = encodeDateWithTwoParams(0, 0);
+        uint64 auxData2 = encodeDateWithTwoParams(0, 0); // (nft tokenId to buy, marketplace Id);
 
         vm.deal(address(this), 10 ether);
         bridge.convert{value: 2 ether, gas: 30000000}(
@@ -70,7 +69,7 @@ contract NFTMarketplaceBridge is BridgeTestBase, IERC721Receiver {
         );
     }
 
-    function encodeDataWithThreeParams(uint16 num1, uint8 num2, uint32 num3) public returns (uint64) {
+    function encodeDataWithThreeParams(uint16 num1, uint8 num2, uint32 num3) public pure returns (uint64) {
         uint16 assetId = num1;
         uint8 marketplaceId = num2;
         uint32 amount = num3;
@@ -78,7 +77,7 @@ contract NFTMarketplaceBridge is BridgeTestBase, IERC721Receiver {
         return auxData;
     }
 
-    function encodeDateWithTwoParams(uint16 num1, uint32 num2) public returns (uint64) {
+    function encodeDateWithTwoParams(uint16 num1, uint32 num2) public pure returns (uint64) {
         uint16 assetId = num1;
         uint40 marketplaceId = num2;
         uint64 auxData = (uint64(assetId) << 40 | uint64(marketplaceId));

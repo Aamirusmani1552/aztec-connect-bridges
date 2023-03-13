@@ -20,6 +20,7 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
     struct Asset {
         uint16 assetId;
         uint8 marketplaceId;
+        bool isSold;
     }
 
     mapping(uint256 => Asset) public assetsByInteractionNonce;
@@ -64,7 +65,7 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
             IERC721 nft = IERC721(_inputAssetA.erc20Address);
             NFTMarketplace marketplaceContract = NFTMarketplace(marketplace);
 
-            Asset memory newOwner = Asset({assetId: assetId, marketplaceId: marketplaceId});
+            Asset memory newOwner = Asset({assetId: assetId, marketplaceId: marketplaceId, isSold: false});
             assetsByInteractionNonce[_interactionNonce] = newOwner;
 
             nft.safeTransferFrom(msg.sender, address(this), 0);
@@ -101,12 +102,13 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
 
         marketplace.BuyNFT{value: msg.value}(tokenId, _outpuAssetA.erc20Address, address(this));
 
-        // IERC721 nftContract = IERC721(_outpuAssetA.erc20Address);
+        IERC721 nftContract = IERC721(_outpuAssetA.erc20Address);
+        require(nftContract.ownerOf(tokenId) == address(this), "Something went wrong");
 
-        // nftContract.approve(ROLLUP_PROCESSOR, tokenId);
+        nftContract.approve(ROLLUP_PROCESSOR, tokenId);
     }
 
-    function encodeDataWithThreeParams(uint16 num1, uint8 num2, uint32 num3) public returns (uint64) {
+    function encodeDataWithThreeParams(uint16 num1, uint8 num2, uint32 num3) public pure returns (uint64) {
         uint16 assetId = num1;
         uint8 marketplaceId = num2;
         uint32 amount = num3;
@@ -114,7 +116,7 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
         return auxData;
     }
 
-    function decodeDataWithThreeParams(uint64 _num) public returns (uint16, uint8, uint32) {
+    function decodeDataWithThreeParams(uint64 _num) public pure returns (uint16, uint8, uint32) {
         uint64 number = _num;
 
         uint16 a = uint16(number >> 40);
@@ -124,7 +126,7 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
         return (a, b, c);
     }
 
-    function encodeDateWithTwoParams(uint16 num1, uint32 num2) public returns (uint64) {
+    function encodeDateWithTwoParams(uint16 num1, uint32 num2) public pure returns (uint64) {
         uint16 assetId = num1;
         uint40 amount = num2;
         uint64 auxData = (uint64(assetId) << 40 | uint64(amount));
@@ -132,7 +134,7 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
         return auxData;
     }
 
-    function decodeDataWithTwoParams(uint64 _num) public returns (uint16, uint40) {
+    function decodeDataWithTwoParams(uint64 _num) public pure returns (uint16, uint40) {
         uint64 number = _num;
 
         uint16 a = uint16(number >> 40);
