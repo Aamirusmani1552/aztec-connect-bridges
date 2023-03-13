@@ -26,16 +26,18 @@ contract NFTMarketplaceBridge is BridgeTestBase, IERC721Receiver {
     }
 
     function setUp() public {
-        vm.prank(deployer);
-        nftMarketplace = new NFTMarketplace();
+        bridge = new NFTBridge(address(this));
+
+        vm.startPrank(deployer);
+        nftMarketplace = new NFTMarketplace(address(bridge));
         vm.stopPrank();
+        vm.deal(address(nftMarketplace), 1 ether);
 
         vm.startPrank(player);
         nft = new MyNFT();
         nft.safeTransferFrom(player, address(this), 0);
         vm.stopPrank();
 
-        bridge = new NFTBridge(address(this));
         bridge.listMarketPlace(address(nftMarketplace));
 
         nft.approve(address(bridge), 0);
@@ -51,6 +53,7 @@ contract NFTMarketplaceBridge is BridgeTestBase, IERC721Receiver {
         NFTMarketplace.NFT memory nftToken = nftMarketplace.getNFTListing(address(bridge), 0);
 
         assertEq(nftToken.owner, address(bridge));
+        console.log(nftToken.owner);
 
         // buying nft
         AztecTypes.AztecAsset memory inputAsset2 =
@@ -60,7 +63,11 @@ contract NFTMarketplaceBridge is BridgeTestBase, IERC721Receiver {
             AztecTypes.AztecAsset({id: 3, erc20Address: address(nft), assetType: AztecTypes.AztecAssetType.VIRTUAL});
 
         uint64 auxData2 = encodeDateWithTwoParams(0, 0);
-        bridge.convert{value: 2 ether}(inputAsset2, emptyAsset, outputAsset, emptyAsset, 0, 0, auxData2, address(0));
+
+        vm.deal(address(this), 10 ether);
+        bridge.convert{value: 2 ether, gas: 30000000}(
+            inputAsset2, emptyAsset, outputAsset, emptyAsset, 2 ether, 0, auxData2, address(0)
+        );
     }
 
     function encodeDataWithThreeParams(uint16 num1, uint8 num2, uint32 num3) public returns (uint64) {
@@ -78,4 +85,8 @@ contract NFTMarketplaceBridge is BridgeTestBase, IERC721Receiver {
 
         return auxData;
     }
+
+    fallback() external payable {}
+
+    receive() external payable {}
 }

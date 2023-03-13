@@ -8,6 +8,7 @@ import {NFTMarketplace} from "./MarketPlace.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ErrorLib} from "../base/ErrorLib.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {console} from "forge-std/console.sol";
 
 error NFTBridge_InputNotAnNFT();
 error NFTNotListed();
@@ -16,14 +17,16 @@ error NFTAlreadyBought();
 contract NFTBridge is BridgeBase, IERC721Receiver {
     uint256 private id = 0;
 
-    struct Owner {
+    struct Asset {
         uint16 assetId;
         uint8 marketplaceId;
     }
 
-    mapping(uint256 => Owner) public ownersByinteractionNonce;
+    mapping(uint256 => Asset) public assetsByInteractionNonce;
 
     mapping(uint256 => address) public listedMarketplace;
+
+    event log(NFTMarketplace.NFT nft);
 
     constructor(address _rollupProcessor) BridgeBase(_rollupProcessor) {}
 
@@ -41,16 +44,12 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
         return currentMarketplaceId;
     }
 
-    function getMarketPlace(uint256 marketplaceId) public returns (address) {
-        return listedMarketplace[id];
-    }
-
     function convert(
         AztecTypes.AztecAsset calldata _inputAssetA,
         AztecTypes.AztecAsset calldata,
         AztecTypes.AztecAsset calldata _outpuAssetA,
         AztecTypes.AztecAsset calldata,
-        uint256,
+        uint256 _totalAmount,
         uint256 _interactionNonce,
         uint64 _auxData,
         address
@@ -65,8 +64,8 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
             IERC721 nft = IERC721(_inputAssetA.erc20Address);
             NFTMarketplace marketplaceContract = NFTMarketplace(marketplace);
 
-            Owner memory newOwner = Owner({assetId: assetId, marketplaceId: marketplaceId});
-            ownersByinteractionNonce[_interactionNonce] = newOwner;
+            Asset memory newOwner = Asset({assetId: assetId, marketplaceId: marketplaceId});
+            assetsByInteractionNonce[_interactionNonce] = newOwner;
 
             nft.safeTransferFrom(msg.sender, address(this), 0);
             nft.approve(marketplace, 0);
@@ -88,8 +87,9 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
         uint64 _auxData
     ) public payable {
         (uint16 tokenId, uint40 marketplaceId) = decodeDataWithTwoParams(_auxData);
-        NFTMarketplace marketplace = NFTMarketplace(getMarketPlace(marketplaceId));
-        NFTMarketplace.NFT memory listedNFT = marketplace.getNFTListing(address(this), tokenId);
+        NFTMarketplace marketplace = NFTMarketplace(listedMarketplace[marketplaceId]);
+
+        NFTMarketplace.NFT memory listedNFT = marketplace.getNFTListing(address(this), uint256(tokenId));
 
         if (listedNFT.owner == address(0)) {
             revert NFTNotListed();
@@ -99,11 +99,11 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
             revert NFTAlreadyBought();
         }
 
-        marketplace.BuyNFT{value: msg.value}(tokenId, _outpuAssetA.erc20Address);
+        marketplace.BuyNFT{value: msg.value}(tokenId, _outpuAssetA.erc20Address, address(this));
 
-        IERC721 nftContract = IERC721(_outpuAssetA.erc20Address);
+        // IERC721 nftContract = IERC721(_outpuAssetA.erc20Address);
 
-        nftContract.approve(ROLLUP_PROCESSOR, tokenId);
+        // nftContract.approve(ROLLUP_PROCESSOR, tokenId);
     }
 
     function encodeDataWithThreeParams(uint16 num1, uint8 num2, uint32 num3) public returns (uint64) {
@@ -140,4 +140,8 @@ contract NFTBridge is BridgeBase, IERC721Receiver {
 
         return (a, b);
     }
+
+    fallback() external payable {}
+
+    receive() external payable {}
 }

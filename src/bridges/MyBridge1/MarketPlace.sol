@@ -4,6 +4,7 @@ pragma solidity ^0.8.10;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "forge-std/console.sol";
 
 error NFTMarketplace_CallerNotOwner();
 error NFTMarketplace_InsufficientFunds();
@@ -25,11 +26,15 @@ contract NFTMarketplace is IERC721Receiver, ReentrancyGuard {
         uint256 price;
     }
 
+    address public bridge;
+
     mapping(address => mapping(uint256 => NFT)) public nftsForListing;
 
     event NFTBought(address indexed buyer, address indexed owner, uint256 price, uint256 indexed tokenId);
 
-    constructor() {}
+    constructor(address _bridgeAddress) {
+        bridge = _bridgeAddress;
+    }
 
     function onERC721Received(address, address, uint256, bytes calldata)
         external
@@ -56,15 +61,15 @@ contract NFTMarketplace is IERC721Receiver, ReentrancyGuard {
         nft.safeTransferFrom(msg.sender, address(this), _tokenId);
     }
 
-    function BuyNFT(uint256 _tokenId, address _nftAddress) public payable nonReentrant {
+    function BuyNFT(uint256 _tokenId, address _nftAddress, address owner) public payable nonReentrant {
         if (_tokenId < 0) {
             revert NFTMarketplace_InvalidTokenId();
         }
 
         IERC721 nft = IERC721(_nftAddress);
-        NFT memory listedNFT = nftsForListing[nft.ownerOf(_tokenId)][_tokenId];
+        NFT memory listedNFT = nftsForListing[owner][_tokenId];
 
-        if (listedNFT.owner == msg.sender) {
+        if (listedNFT.owner == msg.sender && msg.sender != bridge) {
             revert NFTMarketplace_AlreadyOwner();
         }
 
